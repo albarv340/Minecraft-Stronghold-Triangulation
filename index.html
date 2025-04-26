@@ -153,8 +153,8 @@
             const netherZ = (overworldZ / 8);
 
             // Display results
-            document.getElementById('result').innerText = `Intersection: X = ${overworldX.toFixed(2)}, Z = ${overworldZ.toFixed(2)}`;
-            document.getElementById('netherResult').innerText = `Nether Coordinates: X = ${netherX.toFixed(2)}, Z = ${netherZ.toFixed(2)}`;
+            document.getElementById('result').innerText = `Intersection: X = ${overworldX.toFixed()}, Z = ${overworldZ.toFixed()}`;
+            document.getElementById('netherResult').innerText = `Nether Coordinates: X = ${netherX.toFixed()}, Z = ${netherZ.toFixed()}`;
 
             // Estimate accuracy
             const yawError = Math.abs(p1.yaw - p2.yaw); // Difference in yaw
