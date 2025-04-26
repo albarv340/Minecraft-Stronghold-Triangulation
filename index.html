@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Stronghold Triangulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .textarea-container {
+            width: 45%;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+        }
+
+        button {
+            display: block;
+            width: 200px;
+            margin: 0 auto;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .result {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .nether {
+            font-size: 16px;
+            color: #FF5722;
+        }
+
+        .accuracy {
+            font-size: 14px;
+            color: #f57c00;
+            margin-top: 15px;
+        }
+
+        .valid-range {
+            font-size: 14px;
+            color: #2196F3;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Minecraft Stronghold Triangulation</h2>
+
+    <div class="container">
+        <div class="textarea-container">
+            <h3>First F3 + C</h3>
+            <textarea id="input1" placeholder="Paste first F3 + C here..." onchange="triangulate()"></textarea>
+        </div>
+        <div class="textarea-container">
+            <h3>Second F3 + C</h3>
+            <textarea id="input2" placeholder="Paste second F3 + C here..." onchange="triangulate()"></textarea>
+        </div>
+    </div>
+
+    <button onclick="triangulate()">Triangulate</button>
+
+    <p id="result" class="result"></p>
+    <p id="netherResult" class="nether result"></p>
+    <p id="accuracyEstimate" class="accuracy result"></p>
+    <p id="validRangeResult" class="valid-range result"></p>
+
+    <script>
+        function parseLine(line) {
+            const regex = /tp @s ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)/;
+            const match = line.match(regex);
+            if (!match) return null;
+
+            const x = parseFloat(match[1]);
+            const z = parseFloat(match[3]);
+            const yaw = parseFloat(match[4]); // Yaw is the interesting angle
+            return { x, z, yaw };
+        }
+
+        function triangulate() {
+            const line1 = document.getElementById('input1').value.trim();
+            const line2 = document.getElementById('input2').value.trim();
+            if (line1.length < 1 || line2.length < 1) {
+                document.getElementById('result').innerText = 'Please paste at least one line into each set.';
+                return;
+            }
+
+            const p1 = parseLine(line1);
+            const p2 = parseLine(line2);
+
+            if (!p1 || !p2) {
+                document.getElementById('result').innerText = 'Failed to parse one or both input lines.';
+                return;
+            }
+
+            const angle1 = p1.yaw * Math.PI / 180;
+            const angle2 = p2.yaw * Math.PI / 180;
+
+            const dx1 = -Math.sin(angle1); // Minecraft yaw direction
+            const dz1 = Math.cos(angle1);
+
+            const dx2 = -Math.sin(angle2);
+            const dz2 = Math.cos(angle2);
+
+            const denominator = dx1 * dz2 - dz1 * dx2;
+
+            if (Math.abs(denominator) < 1e-6) {
+                document.getElementById('result').innerText = 'Directions are parallel — no intersection.';
+                return;
+            }
+
+            const t = ((p2.x - p1.x) * dz2 - (p2.z - p1.z) * dx2) / denominator;
+
+            const overworldX = p1.x + t * dx1;
+            const overworldZ = p1.z + t * dz1;
+
+            const netherX = (overworldX / 8);
+            const netherZ = (overworldZ / 8);
+
+            // Display results
+            document.getElementById('result').innerText = `Intersection: X = ${overworldX.toFixed(2)}, Z = ${overworldZ.toFixed(2)}`;
+            document.getElementById('netherResult').innerText = `Nether Coordinates: X = ${netherX.toFixed(2)}, Z = ${netherZ.toFixed(2)}`;
+
+            // Estimate accuracy
+            const yawError = Math.abs(p1.yaw - p2.yaw); // Difference in yaw
+            const distance = Math.hypot(p2.x - p1.x, p2.z - p1.z); // Distance between the two points
+
+            const maxError = distance * Math.sin(yawError * Math.PI / 180); // Max error due to yaw
+            const accuracy = maxError.toFixed(2);
+
+            document.getElementById('accuracyEstimate').innerText = `Estimated Accuracy: ±${accuracy} blocks`;
+
+            // Stronghold ring validation
+            const distanceFromOrigin = Math.hypot(overworldX, overworldZ);
+            const rings = [
+                { range: [1280, 2816], strongholds: 3 },
+                { range: [4352, 5888], strongholds: 6 },
+                { range: [7424, 8960], strongholds: 10 },
+                { range: [10496, 12032], strongholds: 15 },
+                { range: [13568, 15104], strongholds: 21 },
+                { range: [16640, 18176], strongholds: 28 },
+                { range: [19712, 21248], strongholds: 36 },
+                { range: [22784, 24320], strongholds: 9 },
+            ];
+
+            let validRing = null;
+            for (let i = 0; i < rings.length; i++) {
+                const ring = rings[i];
+                if (distanceFromOrigin >= ring.range[0] && distanceFromOrigin <= ring.range[1]) {
+                    validRing = ring;
+                    break;
+                }
+            }
+
+            if (validRing) {
+                document.getElementById('validRangeResult').innerText = `This intersection is within a valid stronghold ring with ${validRing.strongholds} strongholds.`;
+                document.getElementById('validRangeResult').style.color = "green";
+            } else {
+                document.getElementById('validRangeResult').innerText = `This intersection is outside any valid stronghold range.`;
+                document.getElementById('validRangeResult').style.color = "red";
+            }
+        }
+    </script>
+</body>
+
+</html>
